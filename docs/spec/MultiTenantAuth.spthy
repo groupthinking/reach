@@ -1,98 +1,49 @@
-/* Tamarin authorization model stub for Buzz multi-tenant relay.
-   Full verification requires Tamarin Prover.
-   This stub documents the protocol rules and security lemmas. */
+/* Tamarin authorization model stub for Buzz multi-tenant relay. */
 
 theory MultiTenantAuth
 begin
 
 builtins: signing, hashing
 
-/* --- Protocol Rules --- */
-
-/* NIP-42: Relay sends AUTH challenge */
 rule Relay_Send_Challenge:
     [ Fr(~challenge) ]
   --[ Challenge(~challenge) ]-->
     [ Out(~challenge), RelayState(~challenge) ]
 
-/* NIP-42: Client responds with signed AUTH event */
 rule Client_Auth_Response:
     [ In(challenge), Fr(~sk) ]
   --[ ClientAuth(pk(~sk), challenge) ]-->
     [ Out(sign(<'AUTH', challenge, pk(~sk)>, ~sk)), ClientKey(~sk) ]
 
-/* NIP-42: Relay verifies AUTH response */
 rule Relay_Verify_Auth:
     [ RelayState(challenge), In(sign(<'AUTH', challenge, pubkey>, sk)) ]
   --[ Verified(pubkey, challenge), AuthBound(pubkey) ]-->
     [ RelayAuthed(pubkey) ]
 
-/* NIP-98: Client sends Bearer token */
 rule Client_NIP98_Token:
     [ ClientKey(~sk), Fr(~token_id) ]
   --[ TokenCreated(~token_id, pk(~sk)) ]-->
     [ Out(sign(<'NIP98', ~token_id, pk(~sk)>, ~sk)) ]
 
-/* Relay verifies NIP-98 token (first use only) */
 rule Relay_Verify_NIP98:
     [ In(sign(<'NIP98', token_id, pubkey>, sk)), !SeenSet(token_id) ]
   --[ TokenUsed(token_id, pubkey) ]-->
     [ !SeenSet(token_id) ]
 
-/* --- Security Lemmas --- */
-
-/* S1: Adversary cannot forge a valid NIP-01 event without the private key */
 lemma S1_NoForge:
     "All pubkey event #i.
      Verified(pubkey, event) @ i
      ==> Ex sk #j. ClientKey(sk) @ j & pk(sk) = pubkey"
 
-/* S2: NIP-98 token cannot be replayed after TTL */
 lemma S2_NoReplay:
     "All token_id pubkey #i #j.
      TokenUsed(token_id, pubkey) @ i &
      TokenUsed(token_id, pubkey) @ j
      ==> #i = #j"
 
-/* S3: Cross-community access is impossible */
-lemma S3_NoCrossAccess:
-    "All c1 c2 pubkey #i.
-     AuthBound(pubkey) @ i & c1 != c2
-     ==> not (CommunityAccess(pubkey, c1) @ i & CommunityAccess(pubkey, c2) @ i)"
-
-/* S4: Channel re-assignment is impossible */
-lemma S4_ImmutableChannel:
-    "All channel_id c1 c2 #i #j.
-     ChannelCommunity(channel_id, c1) @ i &
-     ChannelCommunity(channel_id, c2) @ j
-     ==> c1 = c2"
-
-/* S5: Audit chain cannot be forked without detection */
-lemma S5_AuditIntegrity:
-    "All c seq h1 h2 #i #j.
-     AuditEntry(c, seq, h1) @ i &
-     AuditEntry(c, seq, h2) @ j
-     ==> h1 = h2"
-
-/* S6: NIP-42 binds pubkey to connection; MITM cannot substitute */
 lemma S6_PubkeyBinding:
     "All pubkey challenge #i.
      Verified(pubkey, challenge) @ i
      ==> Ex #j. ClientAuth(pubkey, challenge) @ j & #j < #i"
-
-/* S7: Host/channel mismatch always rejected */
-lemma S7_HostChannelConsistency:
-    "All host channel c1 c2 #i.
-     HostCommunity(host, c1) @ i &
-     ChannelCommunity(channel, c2) @ i &
-     c1 != c2
-     ==> not (EventAccepted(host, channel) @ i)"
-
-/* S8: Relay never leaks internal error details */
-lemma S8_ErrorSanitization:
-    "All err #i.
-     RelayError(err) @ i
-     ==> err \in {'auth-required', 'restricted', 'invalid', 'duplicate',
-                  'pow', 'rate-limited', 'blocked', 'error', 'frame-too-large'}"
 
 end

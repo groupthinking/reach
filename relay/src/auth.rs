@@ -5,11 +5,9 @@ use crate::{
 };
 use anyhow::Result;
 use secp256k1::{schnorr::Signature, XOnlyPublicKey, SECP256K1};
-use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Verify a Schnorr/BIP-340 signature on a Nostr event.
-/// Returns Ok(()) if valid, Err(RelayError::Invalid) otherwise.
 pub fn verify_event_signature(event: &NostrEvent) -> Result<(), RelayError> {
     let computed_id = event.compute_id();
     if computed_id != event.id {
@@ -31,8 +29,6 @@ pub fn verify_event_signature(event: &NostrEvent) -> Result<(), RelayError> {
 }
 
 /// NIP-42 AUTH challenge verification.
-/// Verifies the AUTH event kind (22242), checks created_at within ±60s,
-/// and validates the relay URL and challenge tags.
 pub fn verify_nip42_auth(
     event: &NostrEvent,
     expected_challenge: &str,
@@ -51,7 +47,6 @@ pub fn verify_nip42_auth(
         return Err(RelayError::Invalid);
     }
 
-    // Check relay and challenge tags
     let mut has_relay = false;
     let mut has_challenge = false;
     for tag in &event.tags {
@@ -73,8 +68,6 @@ pub fn verify_nip42_auth(
 }
 
 /// NIP-98 Bearer token verification.
-/// Checks created_at within ±60s, deduplicates via moka seen-set,
-/// verifies signature.
 pub async fn verify_nip98_token(
     event: &NostrEvent,
     state: &AppState,
@@ -94,13 +87,11 @@ pub async fn verify_nip98_token(
         return Err(RelayError::Invalid);
     }
 
-    // Replay protection via moka seen-set
     if state.nip98_seen.get(&event.id).await.is_some() {
         return Err(RelayError::Duplicate);
     }
     state.nip98_seen.insert(event.id.clone(), ()).await;
 
-    // Verify u (URL) and method tags
     let mut has_url = false;
     let mut has_method = false;
     for tag in &event.tags {

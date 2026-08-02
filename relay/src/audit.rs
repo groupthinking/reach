@@ -4,7 +4,6 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 /// Append an entry to the per-community audit hash chain.
-/// Each community has an independent chain; no cross-community references.
 /// Chain invariant: entry_hash = sha256(prev_hash || seq || payload_bytes)
 pub async fn append_entry(
     community_id: Uuid,
@@ -13,12 +12,10 @@ pub async fn append_entry(
 ) -> Result<()> {
     let mut tx = pool.begin().await?;
 
-    // Set RLS context
     sqlx::query(&format!("SET LOCAL app.community_id = '{}'", community_id))
         .execute(&mut *tx)
         .await?;
 
-    // Fetch latest (seq, entry_hash) for this community
     let latest: Option<(i64, String)> = sqlx::query_as(
         "SELECT seq, entry_hash FROM audit_log \
          WHERE community_id = $1 ORDER BY seq DESC LIMIT 1",

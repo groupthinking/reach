@@ -17,7 +17,6 @@ pub async fn resolve_tenant(
 ) -> Result<Uuid> {
     match (channel_id, host) {
         (Some(cid), Some(h)) => {
-            // Resolve from channel
             let channel_community: Option<Uuid> = sqlx::query_scalar(
                 "SELECT community_id FROM channels WHERE id = $1"
             )
@@ -28,7 +27,6 @@ pub async fn resolve_tenant(
             let channel_community = channel_community
                 .ok_or_else(|| anyhow!("channel not found"))?;
 
-            // Resolve from host
             let host_community: Option<Uuid> = sqlx::query_scalar(
                 "SELECT community_id FROM host_community_map WHERE host = $1"
             )
@@ -39,15 +37,13 @@ pub async fn resolve_tenant(
             let host_community = host_community
                 .ok_or_else(|| anyhow!("host not mapped to any community"))?;
 
-            // P-RESOLVE: both must agree
             if channel_community != host_community {
-                return Err(anyhow!("host/channel community mismatch — fail closed"));
+                return Err(anyhow!("host/channel community mismatch - fail closed"));
             }
 
             Ok(channel_community)
         }
         (None, Some(h)) => {
-            // Channel-less event: resolve from host only
             let community: Option<Uuid> = sqlx::query_scalar(
                 "SELECT community_id FROM host_community_map WHERE host = $1"
             )
@@ -58,7 +54,6 @@ pub async fn resolve_tenant(
             community.ok_or_else(|| anyhow!("host not mapped to any community"))
         }
         (Some(cid), None) => {
-            // No host: resolve from channel only
             let community: Option<Uuid> = sqlx::query_scalar(
                 "SELECT community_id FROM channels WHERE id = $1"
             )
@@ -73,7 +68,6 @@ pub async fn resolve_tenant(
 }
 
 /// Set PostgreSQL session-local RLS context variable.
-/// Must be called inside a transaction before every tenant query.
 pub async fn set_tenant_context(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     community_id: Uuid,

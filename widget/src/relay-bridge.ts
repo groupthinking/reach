@@ -14,18 +14,14 @@ interface NostrEvent {
   sig: string;
 }
 
-/** Connect to the Buzz relay and subscribe to the community channel. */
 export function connectRelay(relayUrl: string, channelId: string): void {
-  if (ws) {
-    ws.close();
-  }
+  if (ws) { ws.close(); }
 
   ws = new WebSocket(relayUrl);
   subId = `reach-${Date.now()}`;
 
   ws.onopen = () => {
     console.info('[RelayBridge] Connected to relay:', relayUrl);
-    // NIP-01 REQ — subscribe to channel events
     const req = JSON.stringify(['REQ', subId, { '#e': [channelId], limit: 50 }]);
     ws!.send(req);
   };
@@ -34,16 +30,11 @@ export function connectRelay(relayUrl: string, channelId: string): void {
     try {
       const msg = JSON.parse(event.data as string) as unknown[];
       if (!Array.isArray(msg)) return;
-
       const [type, ...rest] = msg;
-
       if (type === 'EVENT' && rest.length >= 2) {
-        const nostrEvent = rest[1] as NostrEvent;
-        handleRelayEvent(nostrEvent);
+        handleRelayEvent(rest[1] as NostrEvent);
       } else if (type === 'AUTH' && rest.length >= 1) {
-        // NIP-42: respond to AUTH challenge
-        console.info('[RelayBridge] AUTH challenge received — NIP-42 auth required');
-        // In a real deployment, sign the challenge with the user's key here
+        console.info('[RelayBridge] AUTH challenge received - NIP-42 auth required');
       } else if (type === 'NOTICE') {
         console.warn('[RelayBridge] NOTICE:', rest[0]);
       }
@@ -52,22 +43,14 @@ export function connectRelay(relayUrl: string, channelId: string): void {
     }
   };
 
-  ws.onerror = (err) => {
-    console.error('[RelayBridge] WebSocket error:', err);
-  };
-
-  ws.onclose = () => {
-    console.info('[RelayBridge] Disconnected');
-  };
+  ws.onerror = (err) => { console.error('[RelayBridge] WebSocket error:', err); };
+  ws.onclose = () => { console.info('[RelayBridge] Disconnected'); };
 }
 
-/** Disconnect from the relay. */
 export function disconnectRelay(): void {
   if (ws) {
     if (subId) {
-      try {
-        ws.send(JSON.stringify(['CLOSE', subId]));
-      } catch (_) {}
+      try { ws.send(JSON.stringify(['CLOSE', subId])); } catch (_) {}
     }
     ws.close();
     ws = null;
@@ -75,13 +58,10 @@ export function disconnectRelay(): void {
   }
 }
 
-/** Handle an incoming relay event and surface it in the CES widget. */
 function handleRelayEvent(event: NostrEvent): void {
-  // kind 1 = text note, kind 1000+ = custom community events
   if (event.kind === 1) {
     renderCustomText(event.content);
   } else {
-    // Render as a rich card for non-text events
     renderCustomCard({
       type: 'relay_event',
       event_id: event.id,
@@ -93,24 +73,14 @@ function handleRelayEvent(event: NostrEvent): void {
   }
 }
 
-/** Post an audio event from the widget to the API gateway. */
 export async function postAudioEvent(audioBlob: Blob): Promise<void> {
   const formData = new FormData();
   formData.append('audio', audioBlob, 'audio.webm');
-
   try {
-    const resp = await fetch(`${config.apiGatewayUrl}/api/audio`, {
-      method: 'POST',
-      body: formData,
-    });
-    if (!resp.ok) {
-      console.error('[RelayBridge] audio POST failed:', resp.status);
-      return;
-    }
+    const resp = await fetch(`${config.apiGatewayUrl}/api/audio`, { method: 'POST', body: formData });
+    if (!resp.ok) { console.error('[RelayBridge] audio POST failed:', resp.status); return; }
     const result = (await resp.json()) as { transcript: string; understanding: string };
-    if (result.transcript) {
-      renderCustomText(`[Audio] ${result.transcript}`);
-    }
+    if (result.transcript) { renderCustomText(`[Audio] ${result.transcript}`); }
   } catch (err) {
     console.error('[RelayBridge] audio POST error:', err);
   }

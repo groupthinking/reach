@@ -18,9 +18,7 @@ const RELAY_CHANNEL_ID = process.env.RELAY_CHANNEL_ID || '';
 const RELAY_KEYPAIR_RAW = process.env.RELAY_KEYPAIR || '{}';
 
 let relayKeypair = { privateKeyHex: '', publicKeyHex: '' };
-try {
-  relayKeypair = JSON.parse(RELAY_KEYPAIR_RAW);
-} catch (_) {}
+try { relayKeypair = JSON.parse(RELAY_KEYPAIR_RAW); } catch (_) {}
 
 const ChatEventSchema = z.object({
   session_id: z.string(),
@@ -32,24 +30,14 @@ const ChatEventSchema = z.object({
 const app = Fastify({ logger: true });
 await app.register(multipart);
 
-/** POST /api/chat — receive CES session event, forward to Buzz relay */
 app.post('/api/chat', async (request, reply) => {
   const parsed = ChatEventSchema.safeParse(request.body);
   if (!parsed.success) {
     return reply.status(400).send({ error: 'invalid payload', details: parsed.error });
   }
-
   const { message, community_id, channel_id } = parsed.data;
-  const host = request.headers.host || '';
-
   try {
-    await sendEvent(
-      RELAY_URL,
-      community_id || RELAY_COMMUNITY_ID,
-      channel_id || RELAY_CHANNEL_ID,
-      message,
-      relayKeypair
-    );
+    await sendEvent(RELAY_URL, community_id || RELAY_COMMUNITY_ID, channel_id || RELAY_CHANNEL_ID, message, relayKeypair);
     return reply.send({ ok: true });
   } catch (err) {
     app.log.error(err);
@@ -57,20 +45,13 @@ app.post('/api/chat', async (request, reply) => {
   }
 });
 
-/** POST /api/audio — receive audio upload, forward to Audio Flamingo */
 app.post('/api/audio', async (request, reply) => {
   const data = await request.file();
-  if (!data) {
-    return reply.status(400).send({ error: 'no audio file' });
-  }
-
+  if (!data) { return reply.status(400).send({ error: 'no audio file' }); }
   const chunks: Buffer[] = [];
-  for await (const chunk of data.file) {
-    chunks.push(chunk);
-  }
+  for await (const chunk of data.file) { chunks.push(chunk); }
   const audioBuffer = Buffer.concat(chunks);
   const mimeType = data.mimetype || 'audio/webm';
-
   try {
     const result = await audioInfer(AUDIO_SERVICE_URL, audioBuffer, mimeType);
     return reply.send(result);
@@ -80,7 +61,6 @@ app.post('/api/audio', async (request, reply) => {
   }
 });
 
-/** GET /api/token — CES token broker flow */
 app.get('/api/token', async (request, reply) => {
   if (!CES_DEPLOYMENT_NAME) {
     return reply.status(503).send({ error: 'CES_DEPLOYMENT_NAME not configured' });
@@ -94,30 +74,18 @@ app.get('/api/token', async (request, reply) => {
   }
 });
 
-/** GET /health — check all downstream services */
 app.get('/health', async (request, reply) => {
   const checks: Record<string, string> = {};
-
-  // Check relay (HTTP GET /)
   try {
     const relayHttpUrl = RELAY_URL.replace('ws://', 'http://').replace('wss://', 'https://').replace('/ws', '/');
     await axios.get(relayHttpUrl, { timeout: 3000 });
     checks.relay = 'ok';
-  } catch {
-    checks.relay = 'unavailable';
-  }
-
-  // Check audio service
+  } catch { checks.relay = 'unavailable'; }
   try {
     await axios.get(`${AUDIO_SERVICE_URL}/health`, { timeout: 3000 });
     checks.audio = 'ok';
-  } catch {
-    checks.audio = 'unavailable';
-  }
-
-  // CES connectivity (just check env is set)
+  } catch { checks.audio = 'unavailable'; }
   checks.ces = CES_DEPLOYMENT_NAME ? 'configured' : 'not-configured';
-
   const allOk = checks.relay === 'ok' && checks.audio === 'ok';
   return reply.status(allOk ? 200 : 207).send({ status: allOk ? 'ok' : 'degraded', checks });
 });

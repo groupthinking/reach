@@ -1,4 +1,3 @@
-import { readFileSync } from 'fs';
 import { GoogleAuth } from 'google-auth-library';
 
 const auth = new GoogleAuth({
@@ -7,7 +6,6 @@ const auth = new GoogleAuth({
 
 /**
  * Generate a short-lived CES chat token for the token broker flow.
- * POST https://ces.googleapis.com/v1beta/{deploymentName}:generateChatToken
  */
 export async function generateChatToken(deploymentName: string): Promise<string> {
   const client = await auth.getClient();

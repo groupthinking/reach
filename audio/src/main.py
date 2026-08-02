@@ -1,10 +1,9 @@
-"""Audio Flamingo inference service — FastAPI app."""
+"""Audio Flamingo inference service - FastAPI app."""
 from __future__ import annotations
 
 import io
 import logging
 import os
-import tempfile
 from contextlib import asynccontextmanager
 from typing import Optional
 
@@ -14,7 +13,6 @@ import numpy as np
 import soundfile as sf
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from .model import MODEL_CONFIGS, load_model, run_inference
@@ -54,12 +52,8 @@ class WebhookPayload(BaseModel):
     channel_id: str
 
 
-class AudioUrlRequest(BaseModel):
-    audio_url: str
-
-
 def _load_audio_from_bytes(data: bytes) -> np.ndarray:
-    """Load audio bytes → float32 numpy array at 16kHz mono."""
+    """Load audio bytes to float32 numpy array at 16kHz mono."""
     with io.BytesIO(data) as buf:
         audio, sr = sf.read(buf)
     if audio.ndim > 1:
@@ -101,23 +95,14 @@ async def infer(
     elif audio_url:
         audio_array = await _load_audio_from_url(audio_url)
     else:
-        raise HTTPException(
-            status_code=422,
-            detail="Provide either 'audio' file or 'audio_url'",
-        )
+        raise HTTPException(status_code=422, detail="Provide either 'audio' file or 'audio_url'")
 
     output = run_inference(audio_array, _model, _tokenizer)
-
-    # Heuristic: first sentence is transcript, rest is understanding
     parts = output.split(". ", 1)
     transcript = parts[0] if parts else output
     understanding = parts[1] if len(parts) > 1 else ""
 
-    return {
-        "transcript": transcript,
-        "understanding": understanding,
-        "model": BACKEND,
-    }
+    return {"transcript": transcript, "understanding": understanding, "model": BACKEND}
 
 
 @app.post("/webhook")
@@ -128,7 +113,6 @@ async def webhook(payload: WebhookPayload):
 
     audio_array = await _load_audio_from_url(payload.audio_url)
     output = run_inference(audio_array, _model, _tokenizer)
-
     parts = output.split(". ", 1)
     transcript = parts[0] if parts else output
     understanding = parts[1] if len(parts) > 1 else ""
@@ -149,8 +133,4 @@ async def webhook(payload: WebhookPayload):
             except Exception as exc:
                 logger.warning("Failed to post result to relay: %s", exc)
 
-    return {
-        "transcript": transcript,
-        "understanding": understanding,
-        "model": BACKEND,
-    }
+    return {"transcript": transcript, "understanding": understanding, "model": BACKEND}
