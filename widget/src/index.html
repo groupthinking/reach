@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reach — Community Platform</title>
+  <script defer src="https://www.gstatic.com/ces-console/fast/chat-messenger/prod/v1/chat-messenger.js"></script>
+  <link rel="stylesheet" href="https://www.gstatic.com/ces-console/fast/chat-messenger/prod/v1/themes/chat-messenger-default.css">
+  <link rel="stylesheet" href="https://www.gstatic.com/ces-console/fast/chat-messenger/prod/v1/themes/chat-messenger-layout.css">
+  <style>
+    /* Layout */
+    body { margin: 0; font-family: system-ui, sans-serif; background: #f8f9fa; }
+
+    /* CES widget positioning */
+    chat-messenger {
+      z-index: 999;
+      position: fixed;
+      bottom: 0;
+      right: 0;
+    }
+
+    /* CSS token customizations */
+    :root {
+      --chat-messenger-primary-color: #1a73e8;
+      --chat-messenger-font-family: system-ui, -apple-system, sans-serif;
+      --chat-messenger-border-radius: 12px;
+      --chat-messenger-header-background: #1a73e8;
+      --chat-messenger-header-color: #ffffff;
+    }
+  </style>
+</head>
+<body>
+  <main id="app">
+    <h1>Reach Community Platform</h1>
+    <p>Audio-aware multi-tenant community powered by Buzz relay and Audio Flamingo.</p>
+  </main>
+
+  <!--
+    MODALITY config flag (VITE_MODALITY):
+      chat  — text only
+      voice — enable-audio-input-only
+      mixed — enable-audio-input (default)
+  -->
+  <chat-messenger language-code="en" max-query-length="-1" render-mode="slide-in">
+    <chat-messenger-container
+      enable-audio-input
+      enable-file-upload
+      chat-title="Reach">
+    </chat-messenger-container>
+  </chat-messenger>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>
